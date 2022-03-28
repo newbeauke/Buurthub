@@ -1,19 +1,31 @@
 import paho.mqtt.client as mqtt
-import requests
+import TelegramModule as telegram
 
-botToken = "5172717646:AAE9oqTf0dWm2h9DIYhZp1dqNHsv9ACSx7A"
-botChatId = "-627172603"
+nfcTopic = "v3/buurthub@ttn/devices/eui-70b3d57ed004e699/up"
+sensorTopic = "v3/buurthub@tnn/devices/eui-70b3d57ed004e8b9/up"
+
+checkedIn = False
 
 # Callbacks
 def on_connect(client, userdata, flags, rc):
-    client.subscribe("$SYS/#")
-    print("[Buurthub] Connected (code {0})".format(str(rc)))
-    requests.post("https://api.telegram.org/bot{0}/sendMessage?chat_id={1}&text=Als+je+dit+ziet,+kan+je+de+tyfus+krijgen.".format(botToken, botChatId))
+    print("[Buurthub] Succesvol verbonden. (Code {0})".format(str(rc)))
+    telegram.send_start()
 
 def on_message(client, userdata, msg):
-    print("[Buurthub] Incoming message...")
-    print(msg.topic+" "+str(msg.payload))
-    requests.post("https://api.telegram.org/bot{0}/sendMessage?chat_id={1}&text=Inkomend+bericht+van+de+Hub:+{2}".format(botToken, botChatId, msg.payload))
+    print("[Voor ontwikkelaars] Inkomend bericht van: {0}".format(msg.topic))
+    global checkedIn
+    if msg.topic == nfcTopic:
+        checkedIn = not checkedIn
+        if checkedIn:
+            print("[Buurthub] Ingecheckt.")
+        else:
+            print("[Buurthub] Uitgecheckt.")
+    else:
+        if checkedIn:
+            print("[Buurthub] Sensor geactiveerd.")
+        else:
+            print("[Buurthub] Sensor geactiveerd terwijl de gebruiker is uitgecheckt")
+            telegram.send_message("Sensor geactiveerd! Mogelijke inbraak gaande.")
 
 # Initialize client
 client = mqtt.Client()
@@ -24,7 +36,8 @@ client.on_message = on_message
 
 # Connect client
 client.username_pw_set("buurthub@tnn", "NNSXS.B6T7NUQYKIED2DKBZID73USSNAQDK3DVZ3XKYSI.YSPFUXW4SNND57LLYMO4ICFKCWJO23NMG7BTOYDGUZVRMWQBAJRA")
-client.connect("eu1.cloud.thethings.network", 1883, 60)
+client.connect("eu1.cloud.thethings.network", 1883, 3600)
+client.subscribe('#')
 
 # Loop to receive callbacks
 client.loop_forever(3600, 10, False)
